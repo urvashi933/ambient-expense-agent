@@ -28,17 +28,15 @@ def detect_prompt_injection(text: str) -> bool:
             return True
     return False
 
-def security_checkpoint(node_input: str) -> dict:
+def security_checkpoint(ctx, node_input: str):
     """Node function that scrubs PII and checks for prompt injection."""
-    # Use empty string if node_input is not provided or not a string
     if not isinstance(node_input, str):
         node_input = str(node_input) if node_input else ""
         
     clean_desc = scrub_pii(node_input)
     is_injection = detect_prompt_injection(clean_desc)
     
-    return {
-        "prompt": node_input,
-        "clean_description": clean_desc,
-        "security_flag": is_injection
-    }
+    ctx.state["prompt"] = node_input
+    ctx.state["clean_description"] = clean_desc
+    ctx.state["security_flag"] = is_injection
+    return clean_desc

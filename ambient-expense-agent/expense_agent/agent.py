@@ -28,15 +28,17 @@ llm_reviewer = Agent(
     tools=[],
 )
 
-def human_review_node(security_flag: bool) -> dict:
+def human_review_node(ctx, security_flag: bool):
     """Terminal node for human review."""
     if security_flag:
-        return {"human_review_status": "flagged for security"}
-    return {"human_review_status": "pending review"}
+        ctx.state["human_review_status"] = "flagged for security"
+    else:
+        ctx.state["human_review_status"] = "pending review"
+    return ctx.state["human_review_status"]
 
-def route_after_security(security_flag: bool) -> str:
+def route_after_security(ctx) -> str:
     """Route to human review if injected, else LLM reviewer."""
-    if security_flag:
+    if ctx.state.get("security_flag"):
         return "human_review"
     return "llm_reviewer"
 
