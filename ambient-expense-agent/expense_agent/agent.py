@@ -1,30 +1,61 @@
+# ruff: noqa
 import os
-from google.adk.agent import ReActAgent
-from google.adk.model import GoogleModel
-from google.adk.tools import tool
+import google.auth
 
-from expense_agent.config import PROJECT_ID, LOCATION
-from expense_agent.models import ExpenseInput, ExpenseOutput
+from google.adk.agents import Agent
+from google.adk.apps import App
+from google.adk.models import Gemini
+from google.adk.workflow import Workflow, START
+from google.genai import types
 
-@tool
-def record_expense(amount: float, category: str, description: str = "") -> str:
-    """Record an expense with a given amount, category, and optional description."""
-    return f"Successfully recorded expense: ${amount} for {category} ({description})"
+from expense_agent.models import ExpenseState
+from expense_agent.security import security_checkpoint
 
-# Initialize the Gemini model via ADK
-model = GoogleModel(
-    model_name="gemini-2.5-pro",
-    project=PROJECT_ID,
-    location=LOCATION,
+_, project_id = google.auth.default()
+os.environ["GOOGLE_CLOUD_PROJECT"] = project_id or "expense-agent-500015"
+os.environ["GOOGLE_CLOUD_LOCATION"] = "global"
+os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "True"
+
+# --- Nodes ---
+
+llm_reviewer = Agent(
+    name="llm_reviewer",
+    model=Gemini(
+        model="gemini-flash-latest",
+        retry_options=types.HttpRetryOptions(attempts=3),
+    ),
+    instruction="You are an expert expense reviewer. Review the clean expense description and provide a decision.",
+    tools=[],
 )
 
-# Create the ReAct agent
-agent = ReActAgent[ExpenseInput, ExpenseOutput](
+def human_review_node(security_flag: bool) -> dict:
+    """Terminal node for human review."""
+    if security_flag:
+        return {"human_review_status": "flagged for security"}
+    return {"human_review_status": "pending review"}
+
+def route_after_security(security_flag: bool) -> str:
+    """Route to human review if injected, else LLM reviewer."""
+    if security_flag:
+        return "human_review"
+    return "llm_reviewer"
+
+# --- Workflow Graph ---
+
+expense_workflow = Workflow(
+    name="expense_workflow",
+    state_schema=ExpenseState,
+    edges=[
+        (START, security_checkpoint),
+        (security_checkpoint, route_after_security, {
+            "human_review": human_review_node,
+            "llm_reviewer": llm_reviewer
+        }),
+        (llm_reviewer, human_review_node),
+    ]
+)
+
+app = App(
+    root_agent=expense_workflow,
     name="expense_agent",
-    description="An AI assistant that helps users track and manage their expenses.",
-    model=model,
-    tools=[record_expense],
-    system_instruction="""You are a helpful expense management assistant.
-Use your tools to record expenses when the user asks you to.
-Always be polite and concise.""",
 )
