@@ -47,8 +47,20 @@ def detect_prompt_injection(text: str) -> bool:
             
     return False
 
-def security_checkpoint(ctx, prompt: str):
+def security_checkpoint(ctx, node_input=None):
     """Node function that scrubs PII and checks for prompt injection."""
+    prompt = ctx.state.get("prompt", "")
+    if not prompt and node_input:
+        if isinstance(node_input, dict):
+            prompt = node_input.get("prompt", "")
+            if not prompt and "parts" in node_input:
+                parts = node_input.get("parts", [])
+                prompt = "".join(p.get("text", "") for p in parts if isinstance(p, dict))
+        elif hasattr(node_input, "parts"):
+            prompt = "".join(getattr(p, "text", "") or "" for p in node_input.parts)
+        else:
+            prompt = str(node_input)
+            
     if not isinstance(prompt, str):
         prompt = str(prompt) if prompt else ""
         

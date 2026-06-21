@@ -1,4 +1,3 @@
-# ruff: noqa
 import os
 import json
 import google.auth
@@ -12,22 +11,25 @@ from google.genai import types
 from expense_agent.models import ExpenseState
 from expense_agent.security import security_checkpoint
 
-_, project_id = google.auth.default()
-os.environ["GOOGLE_CLOUD_PROJECT"] = project_id or "expense-agent-500015"
-os.environ["GOOGLE_CLOUD_LOCATION"] = "global"
-os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "True"
+# Disable Vertex AI forcing so we can use the local GEMINI_API_KEY
+# _, project_id = google.auth.default()
+# os.environ["GOOGLE_CLOUD_PROJECT"] = project_id or "expense-agent-500015"
+# os.environ["GOOGLE_CLOUD_LOCATION"] = "global"
+# os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "True"
 
 # --- Nodes ---
 
-def submit_decision(ctx, auto_approve: bool, needs_human_review: bool, reason: str):
-    """Submit the routing decision for the expense request."""
-    ctx.state["llm_review_result"] = reason
+from google.adk import Context
+
+def submit_decision(tool_context: Context, auto_approve: bool = False, needs_human_review: bool = False, reason: str = ""):
+    """Tool for LLM to record its routing decision."""
+    tool_context.state["llm_review_result"] = reason
     if needs_human_review:
-        ctx.state["llm_routing"] = "human_review"
+        tool_context.state["llm_routing"] = "human_review"
     elif auto_approve:
-        ctx.state["llm_routing"] = "auto_approve"
+        tool_context.state["llm_routing"] = "auto_approve"
     else:
-        ctx.state["llm_routing"] = "human_review"
+        tool_context.state["llm_routing"] = "human_review"
 
 llm_reviewer = Agent(
     name="llm_reviewer",
@@ -45,30 +47,43 @@ llm_reviewer = Agent(
     tools=[submit_decision],
 )
 
-def human_review_node(ctx, security_flag: bool):
-    """Terminal node for human review."""
-    if security_flag:
-        ctx.state["human_review_status"] = "flagged for security"
-    else:
-        ctx.state["human_review_status"] = "pending review"
-    return ctx.state["human_review_status"]
+def human_review_node_security(ctx):
+    """Terminal node for human review from security."""
+    print("EXECUTING: human_review_node_security")
+    ctx.state["human_review_status"] = "flagged for security"
+    return "flagged"
 
-def route_after_security(ctx) -> str:
+def human_review_node_llm(ctx):
+    """Terminal node for human review from LLM."""
+    print("EXECUTING: human_review_node_llm")
+    ctx.state["human_review_status"] = "pending review"
+    return "pending review"
+
+from google.adk.events import Event
+
+def route_after_security(ctx) -> Event:
     """Route to human review if injected, else LLM reviewer."""
+    print("EXECUTING: route_after_security")
     if ctx.state.get("security_flag"):
-        return "human_review"
-    return "llm_reviewer"
+        print("ROUTING TO: human_review_node_security")
+        return Event(route="human_review_node_security")
+    print("ROUTING TO: llm_reviewer")
+    return Event(route="llm_reviewer")
 
 def auto_approve_node(ctx):
     """Terminal node for auto-approvals."""
+    print("EXECUTING: auto_approve_node")
     ctx.state["human_review_status"] = "auto-approved"
     return "auto-approved"
 
-def route_after_llm(ctx) -> str:
+def route_after_llm(ctx) -> Event:
     """Route based on LLM decision tool."""
+    print("EXECUTING: route_after_llm")
     if ctx.state.get("llm_routing") == "auto_approve":
-        return "auto_approve_node"
-    return "human_review"
+        print("ROUTING TO: auto_approve_node")
+        return Event(route="auto_approve_node")
+    print("ROUTING TO: human_review_node_llm")
+    return Event(route="human_review_node_llm")
 
 def finalize_expense_node(ctx):
     """Mock downstream database and Slack webhook."""
@@ -112,15 +127,16 @@ expense_workflow = Workflow(
     edges=[
         (START, security_checkpoint),
         (security_checkpoint, route_after_security, {
-            "human_review": human_review_node,
+            "human_review_node_security": human_review_node_security,
             "llm_reviewer": llm_reviewer
         }),
         (llm_reviewer, route_after_llm, {
             "auto_approve_node": auto_approve_node,
-            "human_review": human_review_node
+            "human_review_node_llm": human_review_node_llm
         }),
         (auto_approve_node, finalize_expense_node),
-        (human_review_node, finalize_expense_node),
+        (human_review_node_security, finalize_expense_node),
+        (human_review_node_llm, finalize_expense_node),
     ]
 )
 

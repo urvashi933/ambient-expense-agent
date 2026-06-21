@@ -1,0 +1,54 @@
+[
+  {
+    "name": "invoke_node security_checkpoint",
+    "span_id": 17592639285953038874,
+    "trace_id": 88346124632519452266383206916638813905,
+    "start_time": 1782023268918017700,
+    "end_time": 1782023268933847100,
+    "attributes": {
+      "gen_ai.operation.name": "invoke_node",
+      "gen_ai.conversation.id": "1784a2cf-a1ee-4413-ae43-7fec5ce20e6d",
+      "gcp.vertex.agent.associated_event_ids": [
+        "96670905-c3e8-41a1-8a24-46f0727bcfdb"
+      ]
+    },
+    "parent_span_id": 6433884525428940881
+  },
+  {
+    "name": "invoke_node route_after_security",
+    "span_id": 3986444450561217589,
+    "trace_id": 88346124632519452266383206916638813905,
+    "start_time": 1782023268933847100,
+    "end_time": 1782023268950129400,
+    "attributes": {
+      "gen_ai.operation.name": "invoke_node",
+      "gen_ai.conversation.id": "1784a2cf-a1ee-4413-ae43-7fec5ce20e6d",
+      "gcp.vertex.agent.associated_event_ids": [
+        "845541c4-79e8-402e-810e-751f129d6c06"
+      ]
+    },
+    "parent_span_id": 6433884525428940881
+  },
+  {
+    "name": "invoke_workflow expense_workflow",
+    "span_id": 6433884525428940881,
+    "trace_id": 88346124632519452266383206916638813905,
+    "start_time": 1782023268918017700,
+    "end_time": 1782023268950129400,
+    "attributes": {
+      "gen_ai.operation.name": "invoke_workflow",
+      "gen_ai.workflow.name": "expense_workflow",
+      "gen_ai.conversation.id": "1784a2cf-a1ee-4413-ae43-7fec5ce20e6d"
+    },
+    "parent_span_id": 17827380332819474513
+  },
+  {
+    "name": "invocation",
+    "span_id": 17827380332819474513,
+    "trace_id": 88346124632519452266383206916638813905,
+    "start_time": 1782023268903162700,
+    "end_time": 1782023268950129400,
+    "attributes": {},
+    "parent_span_id": null
+  }
+]
