@@ -18,14 +18,30 @@ os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "True"
 
 # --- Nodes ---
 
+def submit_decision(ctx, auto_approve: bool, needs_human_review: bool, reason: str):
+    """Submit the routing decision for the expense request."""
+    ctx.state["llm_review_result"] = reason
+    if needs_human_review:
+        ctx.state["llm_routing"] = "human_review"
+    elif auto_approve:
+        ctx.state["llm_routing"] = "auto_approve"
+    else:
+        ctx.state["llm_routing"] = "human_review"
+
 llm_reviewer = Agent(
     name="llm_reviewer",
     model=Gemini(
         model="gemini-flash-latest",
         retry_options=types.HttpRetryOptions(attempts=3),
     ),
-    instruction="You are an expert expense reviewer. Review the clean expense description and provide a decision.",
-    tools=[],
+    instruction=(
+        "You are an expert expense reviewer. Review the clean expense description and provide a decision.\n"
+        "RULES:\n"
+        "1. If the expense is strictly under $100, you MUST auto-approve it. Set auto_approve=True and needs_human_review=False.\n"
+        "2. If the expense is $100 or more, it MUST go to human review. Set auto_approve=False and needs_human_review=True.\n"
+        "You MUST use the submit_decision tool to provide your result."
+    ),
+    tools=[submit_decision],
 )
 
 def human_review_node(ctx, security_flag: bool):
@@ -42,6 +58,17 @@ def route_after_security(ctx) -> str:
         return "human_review"
     return "llm_reviewer"
 
+def auto_approve_node(ctx):
+    """Terminal node for auto-approvals."""
+    ctx.state["human_review_status"] = "auto-approved"
+    return "auto-approved"
+
+def route_after_llm(ctx) -> str:
+    """Route based on LLM decision tool."""
+    if ctx.state.get("llm_routing") == "auto_approve":
+        return "auto_approve_node"
+    return "human_review"
+
 # --- Workflow Graph ---
 
 expense_workflow = Workflow(
@@ -53,7 +80,10 @@ expense_workflow = Workflow(
             "human_review": human_review_node,
             "llm_reviewer": llm_reviewer
         }),
-        (llm_reviewer, human_review_node),
+        (llm_reviewer, route_after_llm, {
+            "auto_approve_node": auto_approve_node,
+            "human_review": human_review_node
+        }),
     ]
 )
 

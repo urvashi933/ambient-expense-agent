@@ -1,0 +1,17 @@
+{
+  "eval_cases": [
+    {
+      "prompt": "fake prompt",
+      "agent_data": {
+        "turns": [
+          {
+            "turn_index": 0,
+            "events": [
+              {"author": "system", "content": {"parts": [{"text": "Auto-approved"}]}}
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
