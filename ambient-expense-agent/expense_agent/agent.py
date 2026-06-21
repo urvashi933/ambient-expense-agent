@@ -1,5 +1,6 @@
 # ruff: noqa
 import os
+import json
 import google.auth
 
 from google.adk.agents import Agent
@@ -69,6 +70,40 @@ def route_after_llm(ctx) -> str:
         return "auto_approve_node"
     return "human_review"
 
+def finalize_expense_node(ctx):
+    """Mock downstream database and Slack webhook."""
+    status = ctx.state.get("human_review_status", "")
+    if status == "pending review":
+        # Waiting for human, do not finalize yet.
+        return
+        
+    ctx.state["final_recorded"] = True
+    
+    payload = {
+        "description": ctx.state.get("clean_description"),
+        "status": status,
+        "llm_routing": ctx.state.get("llm_routing"),
+        "reason": ctx.state.get("llm_review_result")
+    }
+    
+    db_path = os.path.join("artifacts", "expenses_db.json")
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    
+    db = []
+    if os.path.exists(db_path):
+        with open(db_path, "r") as f:
+            try:
+                db = json.load(f)
+            except json.JSONDecodeError:
+                pass
+                
+    db.append(payload)
+    with open(db_path, "w") as f:
+        json.dump(db, f, indent=2)
+        
+    print(f"\\n[SLACK WEBHOOK] Expense Processed! Status: {status}")
+    return "finalized"
+
 # --- Workflow Graph ---
 
 expense_workflow = Workflow(
@@ -84,6 +119,8 @@ expense_workflow = Workflow(
             "auto_approve_node": auto_approve_node,
             "human_review": human_review_node
         }),
+        (auto_approve_node, finalize_expense_node),
+        (human_review_node, finalize_expense_node),
     ]
 )
 

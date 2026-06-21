@@ -8,3 +8,5 @@ class ExpenseState(BaseModel):
     llm_review_result: str = Field(default="", description="The result from the LLM reviewer.")
     llm_routing: str = Field(default="", description="The routing decision from the LLM (auto_approve or human_review).")
     human_review_status: str = Field(default="pending", description="Status of human review: pending, flagged, auto-approved, approved, rejected.")
+    final_resolution: str = Field(default="", description="The final approved or rejected status.")
+    final_recorded: bool = Field(default=False, description="True if the expense was saved to the DB/Slack.")
