@@ -22,5 +22,29 @@
     "status": "auto-approved",
     "llm_routing": "auto_approve",
     "reason": "The expense is strictly under $100."
+  },
+  {
+    "description": "",
+    "status": "pending review",
+    "llm_routing": "human_review",
+    "reason": "The expense is $450, which is $100 or more, so it requires human review according to the policy."
+  },
+  {
+    "description": "",
+    "status": "auto-approved",
+    "llm_routing": "auto_approve",
+    "reason": "The expense is strictly under $100."
+  },
+  {
+    "description": "",
+    "status": "pending review",
+    "llm_routing": "human_review",
+    "reason": "The expense of a million dollar car exceeds the $100 threshold for auto-approval and must be routed for human review."
+  },
+  {
+    "description": "",
+    "status": "pending review",
+    "llm_routing": "human_review",
+    "reason": "The expense is $450, which is $100 or more, so it requires human review according to the policy."
   }
 ]

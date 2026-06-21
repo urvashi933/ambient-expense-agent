@@ -52,20 +52,21 @@ from google.adk.events import Event, RequestInput
 def human_review_node_security(ctx):
     """Terminal node for human review flagged by security."""
     print("EXECUTING: human_review_node_security")
-    status = ctx.state.get("human_review_status")
-    if status in ["approved", "rejected"]:
-        return status
     ctx.state["human_review_status"] = "flagged for security"
-    return RequestInput(message="flagged for security")
+    return "flagged for security"
 
 def human_review_node_llm(ctx):
     """Terminal node for human review flagged by LLM."""
     print("EXECUTING: human_review_node_llm")
+    ctx.state["human_review_status"] = "pending review"
+    return "pending review"
+
+def route_start(ctx) -> Event:
+    """Route directly to finalization if human review is complete."""
     status = ctx.state.get("human_review_status")
     if status in ["approved", "rejected"]:
-        return status
-    ctx.state["human_review_status"] = "pending review"
-    return RequestInput(message="pending review")
+        return Event(route="finalize_expense_node")
+    return Event(route="security_checkpoint")
 
 def route_after_security(ctx) -> Event:
     """Route to human review if injected, else LLM reviewer."""
@@ -128,7 +129,10 @@ expense_workflow = Workflow(
     name="expense_workflow",
     state_schema=ExpenseState,
     edges=[
-        (START, security_checkpoint),
+        (START, route_start, {
+            "finalize_expense_node": finalize_expense_node,
+            "security_checkpoint": security_checkpoint
+        }),
         (security_checkpoint, route_after_security, {
             "human_review_node_security": human_review_node_security,
             "llm_reviewer": llm_reviewer
