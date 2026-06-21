@@ -35,6 +35,7 @@ llm_reviewer = Agent(
     name="llm_reviewer",
     model=Gemini(
         model="gemini-flash-latest",
+        # Note: If ADK wraps the GenAI SDK directly, ensure the kwarg maps properly to `http_options`
         retry_options=types.HttpRetryOptions(attempts=3),
     ),
     instruction=(
@@ -49,21 +50,38 @@ llm_reviewer = Agent(
 
 from google.adk.events import Event, RequestInput
 
-def human_review_node_security(ctx):
+def human_review_node_security(ctx, node_input=None):
     """Terminal node for human review flagged by security."""
     print("EXECUTING: human_review_node_security")
-    ctx.state["human_review_status"] = "flagged for security"
-    return "flagged for security"
+    if node_input and isinstance(node_input, dict) and "human_review_status" in node_input:
+        ctx.state["human_review_status"] = node_input["human_review_status"]
+        return node_input["human_review_status"]
+    
+    ctx.state["human_review_status"] = "pending review"
+    # FIXED: Return the RequestInput instead of raising it
+    return RequestInput("Waiting for human review")
 
-def human_review_node_llm(ctx):
+def human_review_node_llm(ctx, node_input=None):
     """Terminal node for human review flagged by LLM."""
     print("EXECUTING: human_review_node_llm")
+    if node_input and isinstance(node_input, dict) and "human_review_status" in node_input:
+        ctx.state["human_review_status"] = node_input["human_review_status"]
+        return node_input["human_review_status"]
+        
     ctx.state["human_review_status"] = "pending review"
-    return "pending review"
+    # FIXED: Return the RequestInput instead of raising it
+    return RequestInput("Waiting for human review")
 
-def route_start(ctx) -> Event:
+def route_start(ctx, node_input=None) -> Event:
     """Route directly to finalization if human review is complete."""
     status = ctx.state.get("human_review_status")
+    
+    # Allow external trigger to provide the new status
+    if node_input and isinstance(node_input, dict):
+        if "human_review_status" in node_input:
+            status = node_input["human_review_status"]
+            ctx.state["human_review_status"] = status
+            
     if status in ["approved", "rejected"]:
         return Event(route="finalize_expense_node")
     return Event(route="security_checkpoint")
@@ -120,7 +138,8 @@ def finalize_expense_node(ctx):
     with open(db_path, "w") as f:
         json.dump(db, f, indent=2)
         
-    print(f"\\n[SLACK WEBHOOK] Expense Processed! Status: {status}")
+    # FIXED: Replaced \\n with standard \n
+    print(f"\n[SLACK WEBHOOK] Expense Processed! Status: {status}")
     return "finalized"
 
 # --- Workflow Graph ---

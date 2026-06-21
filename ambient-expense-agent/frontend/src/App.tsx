@@ -50,7 +50,7 @@ function App() {
           appName: 'expense_agent',
           userId: 'test-user',
           sessionId: runId,
-          stateDelta: { human_review_status: decision }
+          nodeInput: { human_review_status: decision }
         })
       });
       fetchRuns();
