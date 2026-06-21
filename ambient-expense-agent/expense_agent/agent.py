@@ -47,19 +47,25 @@ llm_reviewer = Agent(
     tools=[submit_decision],
 )
 
+from google.adk.events import Event, RequestInput
+
 def human_review_node_security(ctx):
-    """Terminal node for human review from security."""
+    """Terminal node for human review flagged by security."""
     print("EXECUTING: human_review_node_security")
+    status = ctx.state.get("human_review_status")
+    if status in ["approved", "rejected"]:
+        return status
     ctx.state["human_review_status"] = "flagged for security"
-    return "flagged"
+    return RequestInput(message="flagged for security")
 
 def human_review_node_llm(ctx):
-    """Terminal node for human review from LLM."""
+    """Terminal node for human review flagged by LLM."""
     print("EXECUTING: human_review_node_llm")
+    status = ctx.state.get("human_review_status")
+    if status in ["approved", "rejected"]:
+        return status
     ctx.state["human_review_status"] = "pending review"
-    return "pending review"
-
-from google.adk.events import Event
+    return RequestInput(message="pending review")
 
 def route_after_security(ctx) -> Event:
     """Route to human review if injected, else LLM reviewer."""
@@ -88,10 +94,7 @@ def route_after_llm(ctx) -> Event:
 def finalize_expense_node(ctx):
     """Mock downstream database and Slack webhook."""
     status = ctx.state.get("human_review_status", "")
-    if status == "pending review":
-        # Waiting for human, do not finalize yet.
-        return
-        
+    print(f"\n[SLACK WEBHOOK] Expense Processed! Status: {status}")
     ctx.state["final_recorded"] = True
     
     payload = {

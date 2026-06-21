@@ -16,5 +16,11 @@
     "status": "flagged for security",
     "llm_routing": null,
     "reason": null
+  },
+  {
+    "description": "Bought a coffee for 4 dollars.",
+    "status": "auto-approved",
+    "llm_routing": "auto_approve",
+    "reason": "The expense is strictly under $100."
   }
 ]
