@@ -1,23 +1,28 @@
 import asyncio
 from expense_agent.agent import expense_workflow
-from expense_agent.models import ExpenseState
-from google.adk.workflow._context import Context
+from google.adk.runners import Runner
+from google.adk.sessions import InMemorySessionService
+from google.genai import types
 
 async def main():
     try:
-        # Run workflow with a simple text message
         print("Starting workflow...")
-        state = ExpenseState()
-        ctx = Context(state=state)
-        agen = expense_workflow.run(
-            ctx=ctx,
-            node_input={"parts": [{"text": "Team dinner at a nice steakhouse for 450 dollars."}], "role": "user"}
+        session_service = InMemorySessionService()
+        session = session_service.create_session_sync(user_id="test_user", app_name="test")
+        runner = Runner(agent=expense_workflow, session_service=session_service, app_name="test")
+        
+        message = types.Content(
+            role="user", parts=[types.Part.from_text(text="Team dinner at a nice steakhouse for 450 dollars.")]
         )
-        async for event in agen:
+
+        for event in runner.run(
+            new_message=message,
+            user_id="test_user",
+            session_id=session.id,
+        ):
             print("EVENT:", event)
             if hasattr(event, "node_name"):
                 print("NODE:", event.node_name)
-        print("STATE:", ctx.state)
     except Exception as e:
         print("EXCEPTION:", e)
         import traceback
